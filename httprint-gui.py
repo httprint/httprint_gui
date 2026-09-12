@@ -50,6 +50,8 @@ DEVICENAME = confmain.get('devicename','')
 SERVER = confmain.get('server','')
 TOKEN = confmain.get('token','')
 PRESPOOL = False
+FULLSCREEN_DEFAULT = confmain.getboolean('fullscreen', fallback=False)
+KEYPAD_DEFAULT = confmain.getboolean('keypad', fallback=False)
 INSTANCENAME = "HTTPrint"
 colors = []
 exe = ""
@@ -468,10 +470,13 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-k",
-        "--k",
+        "--keypad",
         dest="keypad",
         action="store_true",
         help="start with the touch keypad enabled",
     )
     args = parser.parse_args()
-    main(fullscreen=args.fullscreen, keypad=args.keypad)
+    main(
+        fullscreen=args.fullscreen or FULLSCREEN_DEFAULT,
+        keypad=args.keypad or KEYPAD_DEFAULT,
+    )

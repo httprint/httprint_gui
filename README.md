@@ -28,7 +28,7 @@ python3 httprint-gui.py [-h] [-f] [-k]
 options:
   -h, --help        show this help message and exit
   -f, --fullscreen  start in fullscreen mode
-  -k, --k           start with the touch keypad enabled
+  -k, --keypad      start with the touch keypad enabled
 ```
 
 ## Keyboard shortcuts
