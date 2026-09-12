@@ -5,8 +5,10 @@ A simple GUI client to pull files from HTTPrint and send them to the printer
 ## Requirements
 
 * Python3
+* tkinter (for example `python3-tk` on Debian/Ubuntu)
 * CUPS (on linux)
 * SumatraPDF (on windows)
+* Python dependencies from `requirements.txt`
 
 ## Install
 
@@ -14,7 +16,13 @@ Clone this repo
 
 Copy httprint-gui.conf.sample to httprint-gui.conf and change the settings
 
-To have sounds, copy all [files](https://cloud.cristo.re/s/jfRFeHYKM3pcLPi) into the "sounds" folder and install mpg123
+Install Python dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+To have sounds, copy all [files](https://cloud.cristo.re/s/jfRFeHYKM3pcLPi) into the "sounds" folder
 
 On Windows, download [SumatraPDF](https://www.sumatrapdfreader.org/download-free-pdf-viewer) portable into the script folder
 

@@ -31,6 +31,7 @@ import tempfile
 import socket
 
 import tkinter as tk
+import pygame
 
 TMP = tempfile.gettempdir()
 
@@ -381,9 +382,17 @@ def formatcode(code):
         return(ccode)
 
 def play(file):
-    file = os.path.join("sounds", file + ".mp3")
-    if os.path.isfile(file):
-        subprocess.Popen("mpg123 "+ file, shell=True, stdin=DEVNULL, stdout=DEVNULL, stderr=DEVNULL)
+    sound_file = os.path.abspath(os.path.join("sounds", file + ".mp3"))
+    if not os.path.isfile(sound_file):
+        return
+
+    try:
+        if not pygame.get_init():
+            pygame.mixer.init()
+        sound = pygame.mixer.Sound(sound_file)
+        sound.play()
+    except Exception:
+        pass
 
 
 def searchprint(code, ppdstd, ps):
