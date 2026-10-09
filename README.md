@@ -5,7 +5,7 @@ A simple GUI client to pull files from HTTPrint and send them to the printer
 ## Requirements
 
 * Python3
-* tkinter (for example `python3-tk` on Debian/Ubuntu)
+* Pygame (installed from `requirements.txt`)
 * CUPS (on linux)
 * SumatraPDF (on windows)
 * Python dependencies from `requirements.txt`
@@ -22,21 +22,22 @@ Install Python dependencies:
 pip install -r requirements.txt
 ```
 
-To have sounds, copy all [files](https://cloud.cristo.re/s/jfRFeHYKM3pcLPi) into the "sounds" folder
-
 On Windows, download [SumatraPDF](https://www.sumatrapdfreader.org/download-free-pdf-viewer) portable into the script folder
+
+To use custom sounds, place MP3 files named `start.mp3`, `fail.mp3`, `reset.mp3`, `print.mp3`, or `button.mp3` in the `sounds/` folder. An alternative sound set is available [at this link](https://cloud.cristo.re/s/jfRFeHYKM3pcLPi).
 
 Run: python3 httprint-gui.py
 
 ## Command line options
 
 ```text
-python3 httprint-gui.py [-h] [-f] [-k]
+python3 httprint-gui.py [-h] [-f] [-k] [-s]
 
 options:
   -h, --help        show this help message and exit
   -f, --fullscreen  start in fullscreen mode
   -k, --keypad      start with the touch keypad enabled
+  -s, --no-sounds   disable sound playback
 ```
 
 ## Keyboard shortcuts
@@ -62,3 +63,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 Printer icon created by Good Ware - Flaticon
+
+## Third-party asset licenses
+
+The bundled **Courier Prime Regular** font is from [Courier Prime](https://github.com/quoteunquoteapps/CourierPrime) and is licensed under the SIL Open Font License 1.1. See [assets/OFL-CourierPrime.txt](assets/OFL-CourierPrime.txt) for the full license text.
+
+The bundled arcade sounds in `assets/sounds/` are MP3 conversions of sounds from SubspaceAudio's [512 Sound Effects (8-bit style)](https://opengameart.org/content/512-sound-effects-8-bit-style) collection, released under [CC0](https://creativecommons.org/publicdomain/zero/1.0/). The mappings are: `start.mp3` from `sfx_sound_poweron.wav`, `fail.mp3` from `sfx_sound_shutdown1.wav`, `reset.mp3` from `sfx_sound_noise.wav`, `print.mp3` from `sfx_sound_nagger1.wav`, and `button.mp3` from `sfx_coin_double1.wav`.

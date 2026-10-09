@@ -30,10 +30,15 @@ import configparser
 import tempfile
 import socket
 
-import tkinter as tk
 import pygame
 
 TMP = tempfile.gettempdir()
+ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+SOUND_ASSETS_DIR = os.path.join(ASSETS_DIR, "sounds")
+SOUND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds")
+FONT_FILE = os.path.join(ASSETS_DIR, "CourierPrime-Regular.ttf")
+ICON_FILE = os.path.join(ASSETS_DIR, "httprint.png")
+
 
 
 CODE_DIGITS = 4
@@ -53,6 +58,7 @@ TOKEN = confmain.get('token','')
 PRESPOOL = False
 FULLSCREEN_DEFAULT = confmain.getboolean('fullscreen', fallback=False)
 KEYPAD_DEFAULT = confmain.getboolean('keypad', fallback=False)
+SOUNDS_ENABLED = confmain.getboolean('sounds', fallback=True)
 INSTANCENAME = "HTTPrint"
 colors = []
 exe = ""
@@ -60,7 +66,6 @@ exe = ""
 key_lookup = ""
 keytime = 0
 
-root = None
 app = None
 
 
@@ -73,52 +78,42 @@ app = None
 
 # GUI
 class FullscreenApp:
-    def __init__(self, master, fullscreen=False, keypad=False):
-        self.master = master
-        self.master.title("HTTPrint")
-        try:
-            if os.path.exists("httprint.png"):
-                self.master.iconphoto(True, tk.PhotoImage(file="httprint.png"))
-        except Exception:
-            pass
-        self.master.configure(background="black")
+    KEYPAD_VALUES = (
+        ("1", "2", "3", "A"),
+        ("4", "5", "6", "B"),
+        ("7", "8", "9", "C"),
+        ("*", "0", "#", "D"),
+    )
 
-        self.master.geometry("800x600+100+100")
-        self.master.attributes('-fullscreen', fullscreen)
-
-        self.master.bind("<F11>", self.toggle_fullscreen)
-        self.master.bind("<Escape>", self.quit_fullscreen)
-        self.master.bind('<KeyPress>', self.onKeyPress)
-        self.master.bind("<Control-c>", self.quit_app)
-        self.master.bind("<KeyPress-q>", self.quit_app)
-        self.master.bind("<KeyPress-Q>", self.quit_app)
-        self.master.bind("<KeyPress-f>", self.toggle_fullscreen)
-        self.master.bind("<KeyPress-F>", self.toggle_fullscreen)
-        self.master.bind("<KeyPress-k>", self.toggle_keypad)
-        self.master.bind("<KeyPress-K>", self.toggle_keypad)
-
-        self.label = tk.Label(master)
-        self.label.configure(bg="black", fg="lightblue")
-        self.label.place(relx=0, rely=0, relwidth=1, relheight=1)
-
-        self.label.bind("<Configure>", self.on_window_resize)
-
+    def __init__(self, fullscreen=False, keypad=False):
+        pygame.init()
+        pygame.display.set_caption("HTTPrint")
+        if os.path.isfile(ICON_FILE):
+            pygame.display.set_icon(pygame.image.load(ICON_FILE))
+        self.windowed_size = (800, 600)
+        self.fullscreen = fullscreen
+        self.keypad_visible = keypad
         self.text = ""
-        self.keypad_frame = None
-        self.keypad_visible = False
-        if keypad:
-            self.create_touch_keypad()
-            self.show_keypad()
+        self.screen = self._set_display_mode()
+        self.draw()
 
-    def quit_fullscreen(self, event=None):
-        self.master.attributes('-fullscreen', False)
+    def _set_display_mode(self):
+        flags = pygame.FULLSCREEN if self.fullscreen else pygame.RESIZABLE
+        size = (0, 0) if self.fullscreen else self.windowed_size
+        return pygame.display.set_mode(size, flags)
 
-    def toggle_fullscreen(self, event=None):
-        self.master.attributes('-fullscreen', not  self.master.attributes('-fullscreen'))
+    def toggle_fullscreen(self):
+        if not self.fullscreen:
+            self.windowed_size = self.screen.get_size()
+        self.fullscreen = not self.fullscreen
+        self.screen = self._set_display_mode()
 
-    def quit_app(self, event=None):
-        self.master.quit()
-        self.master.destroy()
+    def toggle_keypad(self):
+        self.keypad_visible = not self.keypad_visible
+        self.draw()
+
+    def quit_app(self):
+        pygame.quit()
         raise SystemExit(0)
 
     def normalize_key(self, key):
@@ -127,116 +122,102 @@ class FullscreenApp:
         key = str(key).strip()
         if not key:
             return ""
-        normalized = {
-            "asterisk": "*",
-            "numbersign": "#",
-            "hash": "#",
-            "multiply": "*",
-        }.get(key.lower(), key)
-        if normalized.isalpha():
-            return normalized.upper()
-        return normalized
+        if key.isalpha():
+            return key.upper()
+        return key
 
-    def create_touch_keypad(self):
-        self.keypad_frame = tk.Frame(self.master, bg="black")
-        self.keypad_buttons = []
-        self.keypad_frame.bind("<Configure>", self.on_keypad_resize)
-
-        keypad_values = [
-            ["1", "2", "3", "A"],
-            ["4", "5", "6", "B"],
-            ["7", "8", "9", "C"],
-            ["*", "0", "#", "D"],
-        ]
-        for row, keypad_row in enumerate(keypad_values):
-            for column, value in enumerate(keypad_row):
-                button = tk.Button(
-                    self.keypad_frame,
-                    text=value,
-                    command=lambda v=value: self.simulate_key(v),
-                    bg="#101010",
-                    fg="lightblue",
-                    activebackground="#222222",
-                    activeforeground="lightblue",
-                    font=("COURIER", 28, "bold"),
-                    width=3,
-                    height=2,
-                    relief="flat",
-                )
-                button.grid(row=row, column=column, padx=2, pady=2, sticky="nsew")
-                self.keypad_buttons.append(button)
-
-        for column in range(4):
-            self.keypad_frame.grid_columnconfigure(column, weight=1)
-        for row in range(4):
-            self.keypad_frame.grid_rowconfigure(row, weight=1)
-
-    def on_keypad_resize(self, event):
-        font_size = max(10, int(min(event.width / 16, event.height / 10)))
-        for button in self.keypad_buttons:
-            button.configure(font=("COURIER", font_size, "bold"))
-
-    def show_keypad(self):
-        if self.keypad_frame is None:
-            return
-        self.keypad_frame.place(relx=0.5, rely=1.0, anchor="s", relwidth=0.5, relheight=0.5)
-        self.label.place_configure(relheight=0.5)
-        self.keypad_visible = True
-
-    def hide_keypad(self):
-        if self.keypad_frame is None:
-            return
-        self.keypad_frame.place_forget()
-        self.label.place_configure(relheight=1.0)
-        self.keypad_visible = False
-
-    def toggle_keypad(self, event=None):
-        if self.keypad_frame is None:
-            self.create_touch_keypad()
-        if self.keypad_visible:
-            self.hide_keypad()
-        else:
-            self.show_keypad()
-
-    def simulate_key(self, value):
-        global key_lookup
-        key_lookup = self.normalize_key(value)
-
-    def update_display(self, text = None):
-        if text:
+    def update_display(self, text=None):
+        if text is not None:
             self.text = text
+        self.draw()
 
-        s = self.text.splitlines(True)
-        le = max([len(line) for line in s])
-        ro = len(s)
+    def draw(self):
+        width, height = self.screen.get_size()
+        self.screen.fill((0, 0, 0))
+        display_height = height // 2 if self.keypad_visible else height
+        lines = self.text.splitlines() or [""]
+        metrics_font = pygame.font.Font(FONT_FILE, 100)
+        widest_line = max(1, max(metrics_font.size(line)[0] for line in lines))
+        scale = min(width * 0.9 / widest_line, display_height * 0.7 / (metrics_font.get_linesize() * len(lines)))
+        font = pygame.font.Font(FONT_FILE, max(1, int(100 * scale)))
+        line_height = font.get_linesize()
+        text_height = line_height * len(lines)
+        top = max(0, (display_height - text_height) // 2)
+        for index, line in enumerate(lines):
+            rendered = font.render(line, True, (173, 216, 230))
+            self.screen.blit(rendered, rendered.get_rect(center=(width // 2, top + index * line_height + line_height // 2)))
 
-        width = self.master.winfo_width()
-        height = self.master.winfo_height()
-        new_font_size = min(int(width / le), int(height / ro / 2))
+        if self.keypad_visible:
+            self._draw_keypad(width, height)
+        pygame.display.flip()
 
-        self.label.config(text = self.text, font=("COURIER", new_font_size, "bold"))
+    def _draw_keypad(self, width, height):
+        margin = max(4, min(width, height) // 100)
+        gap = margin
+        keypad_top = height // 2
+        button_width = (width - 2 * margin - 3 * gap) // 4
+        button_height = (height - keypad_top - 2 * margin - 3 * gap) // 4
+        font_size = max(10, min(button_width // 2, button_height // 2))
+        font = pygame.font.Font(FONT_FILE, font_size)
+        self.keypad_buttons = []
 
-    def on_window_resize(self, event):
-        self.update_display()
+        for row, keypad_row in enumerate(self.KEYPAD_VALUES):
+            for column, value in enumerate(keypad_row):
+                rect = pygame.Rect(
+                    margin + column * (button_width + gap),
+                    keypad_top + margin + row * (button_height + gap),
+                    button_width,
+                    button_height,
+                )
+                pygame.draw.rect(self.screen, (16, 16, 16), rect)
+                label = font.render(value, True, (173, 216, 230))
+                self.screen.blit(label, label.get_rect(center=rect.center))
+                self.keypad_buttons.append((rect, value))
 
-    def onKeyPress(self, event=None):
+    def process_events(self):
         global key_lookup
-        key = event.char if event and event.char else (event.keysym if event else "")
-        key_lookup = self.normalize_key(key)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.quit_app()
+            if event.type == pygame.VIDEORESIZE and not self.fullscreen:
+                self.windowed_size = event.size
+                self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
+            elif event.type == pygame.KEYDOWN:
+                modifiers = pygame.key.get_mods()
+                if event.key == pygame.K_q or (event.key == pygame.K_c and modifiers & pygame.KMOD_CTRL):
+                    self.quit_app()
+                elif event.key == pygame.K_F11 or event.key == pygame.K_f:
+                    self.toggle_fullscreen()
+                elif event.key == pygame.K_k:
+                    self.toggle_keypad()
+                elif event.key == pygame.K_ESCAPE:
+                    if self.fullscreen:
+                        self.toggle_fullscreen()
+                    key_lookup = ""
+                elif event.key == pygame.K_BACKSPACE:
+                    key_lookup = "BackSpace"
+                elif event.key == pygame.K_DELETE:
+                    key_lookup = "Delete"
+                else:
+                    key_lookup = self.normalize_key(event.unicode)
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.keypad_visible:
+                for rect, value in getattr(self, "keypad_buttons", []):
+                    if rect.collidepoint(event.pos):
+                        key_lookup = value
+                        break
 
 
 
 
 
 def main(fullscreen=False, keypad=False):
-    global root, app, key_lookup, temp_digits, keytime
+    global app, key_lookup, temp_digits, keytime
 
     logfname = os.path.join(os.path.dirname(os.path.realpath(__file__)),"httprint-gui.log")
     logging.basicConfig(filename=logfname, datefmt='%m/%d/%Y %H:%M:%S', format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)
     # logging.getLogger().addHandler(logging.StreamHandler())
 
-    root = tk.Tk()
-    app = FullscreenApp(root, fullscreen=fullscreen, keypad=keypad)
+    app = FullscreenApp(fullscreen=fullscreen, keypad=keypad)
 
     url = f"{SERVER}/api/serverinfo"
     try:
@@ -258,7 +239,7 @@ def main(fullscreen=False, keypad=False):
     logging.info("SERVER: " + SERVER)
     # logging.info("PRESPOOL: " + str(PRESPOOL))
 
-    app.master.title(INSTANCENAME)
+    pygame.display.set_caption(INSTANCENAME)
     display(INSTANCENAME, DEVICENAME)
     resetdisplay = True
     displaytime = time.time() + 5
@@ -301,6 +282,7 @@ def main(fullscreen=False, keypad=False):
         if code != '':
             if time.time() > keytime + 3:
                 code = ''
+                temp_digits = CODE_DIGITS
                 #keytime = time.time()
                 logging.debug ("Reset")
                 play("reset")
@@ -311,7 +293,7 @@ def main(fullscreen=False, keypad=False):
         if key_lookup != "":
             # print(key_lookup)
             keytime = time.time()
-            if key_lookup in {"Delete", "BackSpace", "Escape"}:
+            if key_lookup in {"Delete", "BackSpace"}:
                 code = ''
                 temp_digits = CODE_DIGITS
                 logging.debug ("Reset")
@@ -357,8 +339,8 @@ def main(fullscreen=False, keypad=False):
 
             key_lookup = ""
 
-        root.update_idletasks()
-        root.update()
+        app.process_events()
+        app.draw()
 
 
 def displaycode(code):
@@ -382,7 +364,12 @@ def formatcode(code):
         return(ccode)
 
 def play(file):
-    sound_file = os.path.abspath(os.path.join("sounds", file + ".mp3"))
+    if not SOUNDS_ENABLED:
+        return
+
+    sound_file = os.path.join(SOUND_DIR, file + ".mp3")
+    if not os.path.isfile(sound_file):
+        sound_file = os.path.join(SOUND_ASSETS_DIR, file + ".mp3")
     if not os.path.isfile(sound_file):
         return
 
@@ -484,7 +471,15 @@ if __name__ == "__main__":
         action="store_true",
         help="start with the touch keypad enabled",
     )
+    parser.add_argument(
+        "-s",
+        "--no-sounds",
+        action="store_true",
+        help="disable sound playback",
+    )
     args = parser.parse_args()
+    if args.no_sounds:
+        SOUNDS_ENABLED = False
     main(
         fullscreen=args.fullscreen or FULLSCREEN_DEFAULT,
         keypad=args.keypad or KEYPAD_DEFAULT,

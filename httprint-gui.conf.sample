@@ -4,3 +4,4 @@ server = https://your.server.org
 token = token1
 fullscreen = false
 keypad = false
+sounds = true
